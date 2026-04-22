@@ -85,6 +85,14 @@ export default class JourneyReporter implements Reporter {
     }
   }
 
+  onStdOut(chunk: Buffer | string): void {
+    process.stdout.write(typeof chunk === 'string' ? chunk : chunk.toString('utf-8'))
+  }
+
+  onStdErr(chunk: Buffer | string): void {
+    process.stderr.write(typeof chunk === 'string' ? chunk : chunk.toString('utf-8'))
+  }
+
   onTestEnd(test: TestCase, result: TestResult): void {
     const journey = journeyName(test)
     const steps = this.stepStack.get(test) ?? []

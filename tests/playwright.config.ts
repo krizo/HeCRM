@@ -18,8 +18,11 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   reporter: [
+    // JourneyReporter owns stdout: it prints its own summary plus
+    // forwards worker stdout/stderr via onStdOut/onStdErr, so exactly
+    // one reporter writes each line — no chance of duplicated log
+    // entries the way combined built-in reporters sometimes produce.
     ['./src/reporters/JourneyReporter.ts'],
-    ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
   use: {
