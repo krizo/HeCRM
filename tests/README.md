@@ -10,10 +10,17 @@ Playwright-based API and UI test suite for HeCRM, built on a strict
 2. **The client is a fixture.** `api` is an aggregated `HeCrmApi` with
    sub-clients per endpoint (`api.accounts.create(...)`, `api.opportunities.win(...)`).
    Specs never touch raw `fetch`.
-3. **Journey steps own the assertions.** Atomic steps (one API call) and
-   compound steps (business processes composed of atomics) both live in
-   `src/journeys/`. Every `expect()` is there — spec files only compose.
-4. **Everything created is cleaned up.** The `data` fixture is a
+3. **Journey steps are atomic and own the assertions.** Every journey
+   function in `src/journeys/` is one HTTP call + one focused assertion,
+   wrapped in `test.step()`. No compound steps hiding multi-action flows.
+   Every `expect()` is inside a step — spec files never assert directly.
+4. **Plumbing is invisible at the call site.** Tests and steps take only
+   **business data** as parameters (accounts, opportunities, quantities,
+   prices). `api`, `data`, `logger`, `testConfig` live in an ambient
+   context ([`src/context.ts`](src/context.ts)) that an auto-fixture
+   populates per test. Steps pull them via `getApi()` / `getData()` /
+   `getLogger()` / `getTestConfig()` on demand.
+5. **Everything created is cleaned up.** The `data` fixture is a
    `DataCollector` that tracks each created resource and deletes them in
    the correct dependency order in teardown. No leaked state across runs.
 
@@ -21,15 +28,17 @@ Playwright-based API and UI test suite for HeCRM, built on a strict
 
 ```
 tests/
-├── playwright.config.ts        # projects: api / ui
-├── .env.example                # all HECRM_* env vars
+├── playwright.config.ts        # projects: api / ui; reporters: JourneyReporter + html
+├── eslint.config.js            # flat config: @eslint/js + typescript-eslint + playwright
+├── .env.example                # all HECRM_* env vars (see below)
 ├── src/
-│   ├── config/                 # TestConfig type + loader
+│   ├── config/                 # TestConfig type + loader from process.env
+│   ├── context.ts              # AsyncLocalStorage-like ambient bag (getApi / getData / …)
 │   ├── clients/                # ApiClient base + 5 sub-clients + HeCrmApi aggregator
-│   ├── fixtures/               # test.extend: testConfig, api, logger, data
-│   ├── journeys/               # atomic + compound business-process steps
+│   ├── fixtures/               # test.extend: testConfig, api, logger, data (+ auto-fixture)
+│   ├── journeys/               # atomic business-process steps (one call + one assert each)
 │   ├── logger/                 # colored, scoped, timing-aware console logger
-│   └── reporters/              # JourneyReporter — custom console + markdown report
+│   └── reporters/              # JourneyReporter — console tree + markdown summary
 ├── api/                        # *.api.spec.ts — backend tests
 └── ui/                         # *.ui.spec.ts — frontend tests (wired up next)
 ```
@@ -136,16 +145,30 @@ only one test is active at a time, so module state is safe. Swap for
 
 ## Custom reporter
 
-`src/reporters/JourneyReporter.ts` is a full `Reporter` implementation:
+`src/reporters/JourneyReporter.ts` is a full `Reporter` implementation.
+Registered first in `playwright.config.ts`, it runs alongside the stock
+`html` reporter.
 
-- Groups tests by **journey** (test-file basename — `accounts.api`, `opportunities.api`, …).
-- Shows a per-test step tree with durations.
-- At the end, prints a color-coded summary and a "Slowest tests" rollup.
-- Writes a machine-consumable `test-results/summary.md` table suitable for
-  CI artifacts / PR comments.
+**Terminal output (real time):**
 
-Custom reporter is registered first in `playwright.config.ts` so it runs
-alongside the stock `html` reporter.
+- A header with active projects and worker count (`onBegin`).
+- One entry per finished test (`onTestEnd`) rendered as a step tree
+  with per-step durations — mirrors the spec file 1:1.
+- A summary block at the end: color-coded PASS/FAIL badge per journey,
+  totals, plus a "Slowest tests" rollup.
+
+**Markdown report (`test-results/summary.md`):**
+
+Written on every run, suitable as a CI artifact or a PR comment. Three
+sections:
+
+1. **Overview** — aggregate table (journey | total | passed | failed | duration).
+2. **Tests by module** — per-journey subsection listing every test that
+   ran with its `#`, title, status badge, and duration. This is the
+   authoritative "what ran" record.
+3. **Failures** — only present when something failed; each entry has the
+   test title, journey, and a fenced code block with the captured error
+   (ANSI sequences stripped for clean rendering).
 
 ### Why the reporter doesn't forward worker stdout
 
@@ -169,3 +192,27 @@ ours.
 injected into every API call inside `ApiClient`. Each HTTP request prints
 method, status (colored by class), and duration. Log level is controlled
 via `HECRM_LOG_LEVEL` (`debug`, `info`, `warn`, `error`).
+
+Inside a journey step the same logger is available via `getLogger()` from
+`src/context.ts` — no need to thread it through function signatures.
+
+## Lint + typecheck doctrine
+
+`ruff` (backend), `eslint` (frontend, tests) are all wired up as
+workspace-local commands — run them before pushing.
+
+Notable rules we had to shape:
+
+- `playwright/expect-expect` **disabled** in `api/**`. Our journey-pattern
+  specs have no inline `expect()` — all assertions live inside journey
+  steps (verify*, create*, advance*, etc.) and the plugin can't see through
+  the `test.step()` wrapper. The doctrine is documented in
+  [`eslint.config.js`](eslint.config.js).
+- `no-empty-pattern` **disabled under `src/fixtures/`**. Playwright fixtures
+  that need no deps require the empty object destructure `({}, use) => …`
+  as their first argument — passing `_` throws at runtime. The rule is
+  kept everywhere else.
+- `@typescript-eslint/no-explicit-any` **error** globally. Our API clients
+  and journey steps are strictly typed against `src/clients/types.ts`,
+  which mirrors the backend Pydantic schemas 1:1. Any `any` is a drift
+  signal.

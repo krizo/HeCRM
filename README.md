@@ -122,18 +122,48 @@ Tagging convention (so `--reset` can find what's ours):
 
 ## Testing
 
-Playwright-based API + UI suite lives in [`tests/`](tests/README.md). Built
-around the **journey pattern**: fixtures supply a typed `testConfig`, an
-`HeCrmApi` client aggregator, a scoped logger, and a `DataCollector` that
-auto-deletes every resource a test created. Specs only compose steps — all
-assertions live in journey functions. A custom `JourneyReporter` groups
-results by business area and writes `test-results/summary.md`.
+Playwright-based API + UI suite lives in [`tests/`](tests/README.md). Five
+design principles — full rationale and code walkthrough in the nested README:
+
+1. **Config is a fixture.** `testConfig` (URLs, creds, seed prefixes) is
+   injected into every test.
+2. **The API client is a fixture.** Specs use `api.accounts.create(...)` etc.
+   — never raw `fetch`.
+3. **Steps are atomic and own the assertions.** Every journey step =
+   one HTTP call + one focused `expect()` wrapped in `test.step()`.
+   No compound steps hiding multi-action flow; the spec file is the flow.
+4. **Plumbing is invisible at the call site.** Test signatures carry only
+   business data. `api`, `data`, `logger`, `testConfig` live in an ambient
+   context the fixture sets up per test.
+5. **Everything created is cleaned up.** A `DataCollector` tracks resources
+   and deletes them in dependency order on teardown — zero leaked state.
+
+Output:
+
+- **Terminal** — color-coded step tree per test + per-journey PASS/FAIL
+  summary + slowest-tests rollup (via a custom `JourneyReporter`).
+- **`test-results/summary.md`** — overview table, full per-module test
+  listing, and failure details with stripped ANSI. Suitable as a CI
+  artifact or PR comment.
 
 ```bash
 cd tests
 npm install && cp .env.example .env
-npm run test:api
+npm run test:api           # step tree + summary (quiet on HTTP)
+npm run test:api:verbose   # add `list` reporter to see every HTTP call
+npm run lint               # ESLint flat config, --max-warnings=0
 ```
+
+## Lint + typecheck
+
+Each workspace ships its own lint + typecheck entry-point; all are wired
+to fail on any warning.
+
+| Workspace  | Tool    | Command         |
+|------------|---------|-----------------|
+| backend    | ruff    | `make lint`     |
+| frontend   | ESLint  | `npm run lint`  |
+| tests      | ESLint  | `npm run lint`  |
 
 ## Roadmap
 
