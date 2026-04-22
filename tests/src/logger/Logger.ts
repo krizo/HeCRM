@@ -57,7 +57,6 @@ export class Logger {
   step(name: string): void {
     if (this.minLevel > LEVEL_ORDER.info) return
     const header = `${ANSI.bold}${ANSI.blue}▶ ${name}${ANSI.reset}`
-    // eslint-disable-next-line no-console
     console.log(`${ANSI.gray}${stamp()}${ANSI.reset} ${ANSI.magenta}[${this.scope}]${ANSI.reset} ${header}`)
   }
 
@@ -75,7 +74,6 @@ export class Logger {
               : ANSI.red
     const statusStr = status === undefined ? '---' : String(status)
     const duration = durationMs !== undefined ? `${ANSI.gray}(${durationMs.toFixed(0)}ms)${ANSI.reset}` : ''
-    // eslint-disable-next-line no-console
     console.log(
       `${ANSI.gray}${stamp()}${ANSI.reset} ${ANSI.magenta}[${this.scope}]${ANSI.reset} ` +
         `${ANSI.dim}http${ANSI.reset} ${method.padEnd(6)} ${statusColor}${statusStr}${ANSI.reset} ${url} ${duration}`,
@@ -87,7 +85,6 @@ export class Logger {
     const prefix = `${ANSI.gray}${stamp()}${ANSI.reset} ${ANSI.magenta}[${this.scope}]${ANSI.reset}`
     const badge = `${color}${level.toUpperCase().padEnd(5)}${ANSI.reset}`
     const metaStr = meta !== undefined ? ` ${ANSI.dim}${safeJson(meta)}${ANSI.reset}` : ''
-    // eslint-disable-next-line no-console
     console.log(`${prefix} ${badge} ${msg}${metaStr}`)
   }
 }

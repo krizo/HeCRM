@@ -22,7 +22,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   })
   if (!response.ok) {
-    let body: unknown = null
+    let body: unknown
     try {
       body = await response.json()
     } catch {

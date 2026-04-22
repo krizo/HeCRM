@@ -1,14 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
-import {
-  Badge,
-  Card,
-  CardHeader,
-  Empty,
-  ErrorBox,
-  Loading,
-  formatDate,
-  formatMoney,
-} from '../components/ui'
+import { Badge, Card, CardHeader, Empty, ErrorBox, Loading } from '../components/ui'
+import { formatDate, formatMoney } from '../lib/format'
 import { useAccount, useSalesOrder, useSalesOrderLines } from '../hooks/queries'
 import { SALES_ORDER_STATE_LABEL } from '../lib/types'
 

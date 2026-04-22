@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Badge, Card, CardHeader, Empty, ErrorBox, Loading, formatMoney } from '../components/ui'
+import { Badge, Card, CardHeader, Empty, ErrorBox, Loading } from '../components/ui'
+import { formatMoney } from '../lib/format'
 import {
   useAccounts,
   useOpportunities,

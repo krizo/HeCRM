@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Badge, Card, Empty, ErrorBox, Loading, formatMoney } from '../components/ui'
+import { Badge, Card, Empty, ErrorBox, Loading } from '../components/ui'
+import { formatMoney } from '../lib/format'
 import { useProducts } from '../hooks/queries'
 import { PRODUCT_STATE_LABEL } from '../lib/types'
 

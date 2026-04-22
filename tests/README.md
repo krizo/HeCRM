@@ -48,7 +48,17 @@ npm run test:api                # api project only
 npm run test:ui                 # ui project only (once written)
 npm test                        # both
 npm run report                  # open the HTML report
+npm run typecheck               # TypeScript strict, no emit
+npm run lint                    # ESLint flat config, --max-warnings=0
+npm run lint:fix                # auto-fix what ESLint knows how to
 ```
+
+ESLint flat config ([`eslint.config.js`](eslint.config.js)) extends
+`@eslint/js recommended` + `typescript-eslint recommended` +
+`eslint-plugin-playwright` (recommended). Journey-pattern tests have no
+inline `expect()` calls — `playwright/expect-expect` is disabled with a
+comment explaining why (assertions live in journey steps). Unused
+fixture parameters use `_` to satisfy `no-empty-pattern`.
 
 ## Step granularity — atomic only
 

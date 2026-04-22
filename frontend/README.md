@@ -21,6 +21,22 @@ npm run dev                 # http://127.0.0.1:5173
 The backend needs to be running separately (`cd backend && make dev`).
 CORS is already configured backend-side for `http://localhost:5173`.
 
+## Lint + typecheck
+
+```bash
+npm run typecheck          # TypeScript strict mode, all files
+npm run lint               # ESLint (flat config, --max-warnings=0)
+npm run lint:fix           # auto-fix what ESLint knows how to
+```
+
+ESLint config ([`eslint.config.js`](eslint.config.js)) extends
+`@eslint/js recommended` + `typescript-eslint recommended`, plus
+`eslint-plugin-react-hooks` and `eslint-plugin-react-refresh` for Vite HMR
+safety. Notable extra rules: consistent `type` imports, unused-vars with
+`_`-prefix escape, and the `only-export-components` check that pushed
+utility helpers (e.g. `formatMoney`) out of `src/components/ui.tsx` into
+`src/lib/format.ts`.
+
 ## Pages
 
 | Route                     | What it shows                                                |

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Badge, Card, Empty, ErrorBox, Loading, formatDate, formatMoney } from '../components/ui'
+import { Badge, Card, Empty, ErrorBox, Loading } from '../components/ui'
+import { formatDate, formatMoney } from '../lib/format'
 import { useSalesOrders } from '../hooks/queries'
 import { SALES_ORDER_STATE_LABEL } from '../lib/types'
 

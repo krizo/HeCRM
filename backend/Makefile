@@ -20,6 +20,9 @@ test:
 lint:
 	$(VENV)/bin/ruff check .
 
+lint-fix:
+	$(VENV)/bin/ruff check . --fix
+
 format:
 	$(VENV)/bin/ruff format .
 
