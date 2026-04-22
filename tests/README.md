@@ -50,38 +50,62 @@ npm test                        # both
 npm run report                  # open the HTML report
 ```
 
-## What makes a step a step?
+## Step granularity — atomic only
 
-Every journey function follows the same shape:
+**Every journey function is atomic: one HTTP call + one focused assertion.**
+Compound steps that hide multi-action flow are explicitly avoided — they make
+specs short but opaque, and a reader of the test should be able to see
+exactly which business actions happen and in what order.
 
 ```ts
-export async function openDealAgainst(ctx: Ctx, customer: Account, opts?) {
-  return test.step(`open sales deal against "${customer.name}"`, async () => {
-    const opp = await createOpportunity(ctx, { ... })                    // atomic
-    await verifyOpportunityAppearsInStageFilter(ctx, opp.id, 'prospecting') // atomic
-    return opp
+export async function advanceOpportunityToStage(
+  { api }: Ctx,
+  opportunity: Opportunity,
+  stage: Exclude<OpportunityStage, 'won' | 'lost'>,
+): Promise<Opportunity> {
+  return test.step(`advance "${opportunity.name}" to stage=${stage}`, async () => {
+    const updated = await api.opportunities.setStage(opportunity.id, stage)
+    expect(updated.stage).toBe(stage)
+    return updated
   })
 }
 ```
 
-- Wrapped in `test.step()` so the reporter can render it in the tree.
+- Wrapped in `test.step()` so the reporter renders it in the tree.
 - Takes a `Ctx` (the `api` + `data` bundle from the fixture).
-- Returns the thing it created — or just asserts and returns `void`.
-- Composes smaller steps when it represents a business process.
+- Makes exactly one API call.
+- Asserts exactly what that call was supposed to achieve.
 
 ## Test spec shape
 
-A spec is narrative — it tells a story by naming steps. **No assertions.**
+A spec reads top-to-bottom as the exact sequence of business actions. **No
+assertions in the spec itself** — just a clean list of step calls:
 
 ```ts
-test('full sales cycle: open → walk → win', async ({ api, data }) => {
+test('full sales cycle: prospect → develop → propose → close → win', async ({ api, data }) => {
   const ctx = { api, data }
-  const distributor = await establishDistributor(ctx)
-  const opp        = await openDealAgainst(ctx, distributor, { value: 250000 })
-  const closing    = await walkOpportunityThroughPipeline(ctx, opp)
-  await winAndVerify(ctx, closing)
+
+  const distributor = await createDistributor(ctx, { name: `Full Cycle ${Date.now()}` })
+  const opportunity = await createOpportunity(ctx, {
+    customer: distributor,
+    value: 250000,
+    stage: 'prospecting',
+  })
+
+  await advanceOpportunityToStage(ctx, opportunity, 'developing')
+  await advanceOpportunityToStage(ctx, opportunity, 'proposing')
+  await advanceOpportunityToStage(ctx, opportunity, 'closing')
+  await winOpportunity(ctx, opportunity)
+
+  await verifyOpportunityIsInStageFilter(ctx, opportunity, 'won')
+  await verifyOpportunityIsNotInOpenList(ctx, opportunity)
 })
 ```
+
+Reading this test — without knowing Playwright or the backend — you can list
+every business action: create dist → create opp → advance stage ×3 → win →
+verify in Won filter → verify not in open list. That's the flow, and the
+reporter's step tree mirrors it 1:1.
 
 ## Custom reporter
 

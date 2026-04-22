@@ -1,33 +1,58 @@
 import { test } from '../src/fixtures/baseFixture.js'
 import {
-  establishDistributor,
-  onboardRetailUnderDistributor,
-  searchAccountsByName,
-  verifyDistributorFilterExcludes,
+  createDistributor,
+  createRetailUnderDistributor,
+  fetchAccountById,
+  verifyAccountHasParent,
+  verifyAccountIsInFilter,
+  verifyAccountIsNotInFilter,
+  verifySearchFindsAccount,
 } from '../src/journeys/accountSteps.js'
 
 test.describe('Accounts journey', () => {
-  test('establishing a new distributor makes it visible in the distributor filter', async ({ api, data }) => {
-    await establishDistributor({ api, data }, { name: `Test Dist — Pipeline ${Date.now()}`, city: 'Wrocław' })
+  test('distributor appears in distributor filter and stays out of retail filter', async ({
+    api,
+    data,
+  }) => {
+    const ctx = { api, data }
+
+    const distributor = await createDistributor(ctx, { name: `Dist — Warsaw ${Date.now()}` })
+
+    await verifyAccountIsInFilter(ctx, distributor, 'distributor')
+    await verifyAccountIsNotInFilter(ctx, distributor, 'retail')
   })
 
-  test('a retail account can be onboarded under a distributor and stays there on refetch', async ({ api, data }) => {
+  test('retail account is parented to its distributor and the link survives refetch', async ({
+    api,
+    data,
+  }) => {
     const ctx = { api, data }
-    const distributor = await establishDistributor(ctx, { name: `Parent Dist ${Date.now()}` })
-    await onboardRetailUnderDistributor(ctx, distributor, { name: `Child Retail ${Date.now()}` })
+
+    const distributor = await createDistributor(ctx, { name: `Parent Dist ${Date.now()}` })
+    const retail = await createRetailUnderDistributor(ctx, distributor, {
+      name: `Child Retail ${Date.now()}`,
+    })
+    const refetched = await fetchAccountById(ctx, retail.id)
+
+    await verifyAccountHasParent(ctx, refetched, distributor)
   })
 
-  test('retail accounts never leak into the distributor filter', async ({ api, data }) => {
+  test('retail account never leaks into the distributor filter', async ({ api, data }) => {
     const ctx = { api, data }
-    const distributor = await establishDistributor(ctx)
-    const retail = await onboardRetailUnderDistributor(ctx, distributor)
-    await verifyDistributorFilterExcludes(ctx, retail)
+
+    const distributor = await createDistributor(ctx)
+    const retail = await createRetailUnderDistributor(ctx, distributor)
+
+    await verifyAccountIsInFilter(ctx, retail, 'retail')
+    await verifyAccountIsNotInFilter(ctx, retail, 'distributor')
   })
 
-  test('name substring search surfaces a previously created account', async ({ api, data }) => {
+  test('name substring search surfaces a freshly created account', async ({ api, data }) => {
     const ctx = { api, data }
-    const tag = `Unique${Date.now()}`
-    await establishDistributor(ctx, { name: `${tag} Warehouse Group` })
-    await searchAccountsByName(ctx, tag, tag)
+    const uniqueTag = `Tag${Date.now()}`
+
+    const distributor = await createDistributor(ctx, { name: `${uniqueTag} Warehouse Group` })
+
+    await verifySearchFindsAccount(ctx, uniqueTag, distributor)
   })
 })
