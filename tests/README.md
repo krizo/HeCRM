@@ -59,12 +59,11 @@ exactly which business actions happen and in what order.
 
 ```ts
 export async function advanceOpportunityToStage(
-  { api }: Ctx,
   opportunity: Opportunity,
   stage: Exclude<OpportunityStage, 'won' | 'lost'>,
 ): Promise<Opportunity> {
   return test.step(`advance "${opportunity.name}" to stage=${stage}`, async () => {
-    const updated = await api.opportunities.setStage(opportunity.id, stage)
+    const updated = await getApi().opportunities.setStage(opportunity.id, stage)
     expect(updated.stage).toBe(stage)
     return updated
   })
@@ -72,40 +71,57 @@ export async function advanceOpportunityToStage(
 ```
 
 - Wrapped in `test.step()` so the reporter renders it in the tree.
-- Takes a `Ctx` (the `api` + `data` bundle from the fixture).
+- Takes **only business parameters** (the opportunity, the target stage).
+  `api`, `data`, `logger`, `testConfig` are fetched on demand via
+  `getApi()` / `getData()` / `getLogger()` / `getTestConfig()`, which pull
+  from the ambient context the auto-fixture sets up per test.
 - Makes exactly one API call.
 - Asserts exactly what that call was supposed to achieve.
 
 ## Test spec shape
 
-A spec reads top-to-bottom as the exact sequence of business actions. **No
-assertions in the spec itself** — just a clean list of step calls:
+A spec reads top-to-bottom as the exact sequence of business actions. The
+signature of the async callback is **empty** — no `{ api, data }`
+destructuring, no plumbing context variable. Every argument visible is real
+business data. **No assertions in the spec itself** — just a clean list of
+step calls:
 
 ```ts
-test('full sales cycle: prospect → develop → propose → close → win', async ({ api, data }) => {
-  const ctx = { api, data }
-
-  const distributor = await createDistributor(ctx, { name: `Full Cycle ${Date.now()}` })
-  const opportunity = await createOpportunity(ctx, {
+test('full sales cycle: prospect → develop → propose → close → win', async () => {
+  const distributor = await createDistributor({ name: `Full Cycle ${Date.now()}` })
+  const opportunity = await createOpportunity({
     customer: distributor,
     value: 250000,
     stage: 'prospecting',
   })
 
-  await advanceOpportunityToStage(ctx, opportunity, 'developing')
-  await advanceOpportunityToStage(ctx, opportunity, 'proposing')
-  await advanceOpportunityToStage(ctx, opportunity, 'closing')
-  await winOpportunity(ctx, opportunity)
+  await advanceOpportunityToStage(opportunity, 'developing')
+  await advanceOpportunityToStage(opportunity, 'proposing')
+  await advanceOpportunityToStage(opportunity, 'closing')
+  await winOpportunity(opportunity)
 
-  await verifyOpportunityIsInStageFilter(ctx, opportunity, 'won')
-  await verifyOpportunityIsNotInOpenList(ctx, opportunity)
+  await verifyOpportunityIsInStageFilter(opportunity, 'won')
+  await verifyOpportunityIsNotInOpenList(opportunity)
 })
 ```
 
 Reading this test — without knowing Playwright or the backend — you can list
-every business action: create dist → create opp → advance stage ×3 → win →
+every business action and every piece of data fed to it: create distributor
+(name = `Full Cycle ...`) → create opportunity (customer = distributor,
+value = 250000, stage = prospecting) → advance to three stages → win →
 verify in Won filter → verify not in open list. That's the flow, and the
 reporter's step tree mirrors it 1:1.
+
+### Why no `{ api, data }` in the test signature
+
+Plumbing (API client, data collector, logger) is noise at the call site.
+A test's signature should declare **what the test is about** — the inputs
+it's exercising. An auto-fixture ([`baseFixture.ts`](src/fixtures/baseFixture.ts))
+sets a module-level context (`src/context.ts`) before each test, steps
+pull what they need via `getApi()` / `getData()` / `getLogger()`. Because
+`workers: 1` + `fullyParallel: false` is pinned in `playwright.config.ts`
+only one test is active at a time, so module state is safe. Swap for
+`AsyncLocalStorage` if/when we enable parallelism.
 
 ## Custom reporter
 
