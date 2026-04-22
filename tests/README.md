@@ -44,7 +44,8 @@ npm install
 # make sure the backend is up on http://127.0.0.1:8000
 (cd ../backend && source .venv/bin/activate && make dev) &
 
-npm run test:api                # api project only
+npm run test:api                # api project only (quiet — step tree + summary only)
+npm run test:api:verbose        # api project with per-request HTTP log lines (`list` reporter added)
 npm run test:ui                 # ui project only (once written)
 npm test                        # both
 npm run report                  # open the HTML report
@@ -144,7 +145,23 @@ only one test is active at a time, so module state is safe. Swap for
   CI artifacts / PR comments.
 
 Custom reporter is registered first in `playwright.config.ts` so it runs
-alongside the stock `list` + `html` reporters.
+alongside the stock `html` reporter.
+
+### Why the reporter doesn't forward worker stdout
+
+`JourneyReporter` deliberately omits `onStdOut` / `onStdErr` handlers.
+IDE Playwright integrations (WebStorm, VS Code) silently inject their
+own reporter that echoes worker output to the IDE's terminal pane.
+Forwarding the same chunk here on top of that caused every logger line
+to appear twice under an IDE-launched run. The `list` reporter has the
+same problem when stacked. Leaving stdout forwarding solely to whichever
+tool is "on top" keeps each line exactly once in every invocation mode.
+
+When running via `npm run test:api` (no IDE, no `list`), per-request
+HTTP logs are silent by design — the step tree tells you the business
+flow. If you need the HTTP-level detail from the CLI, use
+`npm run test:api:verbose` which stacks the `list` reporter on top of
+ours.
 
 ## Logger
 

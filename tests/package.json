@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:api": "playwright test --project=api",
+    "test:api:verbose": "playwright test --project=api --reporter=./src/reporters/JourneyReporter.ts,list",
     "test:ui": "playwright test --project=ui",
     "test": "playwright test",
     "report": "playwright show-report",

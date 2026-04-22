@@ -85,24 +85,19 @@ export default class JourneyReporter implements Reporter {
     }
   }
 
-  // Worker stdout/stderr handling.
+  // No onStdOut / onStdErr handlers.
   //
-  // Under a TTY (direct CLI invocation, IDE run-test-at-line), Playwright's
-  // internal runner already writes the worker's stdout to the terminal, so
-  // forwarding the same chunk again here would double every logger line.
+  // Reporters (both built-in and IDE-injected) are what forward worker
+  // output to the terminal. When *two* reporters both do it, every logger
+  // line shows up twice. IDE Playwright integrations (WebStorm, VS Code)
+  // silently register their own reporter that echoes — if we also echo
+  // here, the user sees duplicates regardless of `list` reporter or
+  // isTTY checks.
   //
-  // Under piped stdio (`npm run test:api`, CI), Playwright does NOT echo
-  // worker output on its own — without this forwarder, logger output would
-  // vanish. So we forward exactly when stdio is piped.
-  onStdOut(chunk: Buffer | string): void {
-    if (process.stdout.isTTY) return
-    process.stdout.write(typeof chunk === 'string' ? chunk : chunk.toString('utf-8'))
-  }
-
-  onStdErr(chunk: Buffer | string): void {
-    if (process.stderr.isTTY) return
-    process.stderr.write(typeof chunk === 'string' ? chunk : chunk.toString('utf-8'))
-  }
+  // Trade-off: running via `npm run test:api` (no IDE reporter, no `list`
+  // reporter) means per-request logger lines are not visible on the
+  // terminal — use `npm run test:api:verbose` which adds `list` when
+  // stdout visibility is required from the CLI.
 
   onTestEnd(test: TestCase, result: TestResult): void {
     const journey = journeyName(test)
