@@ -20,7 +20,12 @@ class Settings(BaseSettings):
     api_version: str = Field(default="v9.2")
     request_timeout_seconds: float = Field(default=30.0, gt=0)
     cors_allow_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:5173", "http://localhost:3000"]
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
     )
 
     @field_validator("cors_allow_origins", mode="before")
