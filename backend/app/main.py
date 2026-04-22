@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import accounts, health
+from app.api import accounts, contacts, health, opportunities, products, salesorders
 from app.config import Settings, get_settings
 from app.dynamics.auth import DataverseTokenProvider
 from app.dynamics.client import DataverseClient
@@ -40,6 +40,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(accounts.router, prefix="/api")
+    app.include_router(contacts.router, prefix="/api")
+    app.include_router(products.router, prefix="/api")
+    app.include_router(opportunities.router, prefix="/api")
+    app.include_router(salesorders.router, prefix="/api")
 
     @app.exception_handler(DataverseError)
     async def dataverse_exception_handler(_: Request, exc: DataverseError) -> JSONResponse:

@@ -6,11 +6,14 @@ Dynamics 365 (Dataverse Web API)**.
 
 The domain models a drinks company that serves two customer groups:
 
-- **Retail** — bars, restaurants, shops that buy directly.
-- **Distributors** — wholesalers that aggregate retail accounts underneath them.
+- **Retail** — bars, restaurants, shops that buy through distributors.
+- **Distributors** — regional wholesalers that aggregate retail accounts.
 
 Data lives in Dynamics 365 — HeCRM is a thin, testable surface over the
 Dataverse Web API, designed from day one to be automated against.
+
+> **Full business narrative:** [docs/SALES_PROCESS.md](docs/SALES_PROCESS.md) —
+> every entity, stage, and endpoint derives from this document.
 
 ## Repository layout
 
@@ -30,10 +33,11 @@ HeCRM/
 | Retail → distributor | `account.parentaccountid` | A retail account's parent points at its distributor    |
 | Contact person       | `contact`        | Linked to an account via `parentcustomerid`                     |
 | Product (SKU)        | `product`        | Beer / beverage SKUs                                            |
-| Pipeline             | `opportunity`    | Sales opportunities, typically against distributors             |
-| Order                | `salesorder`     | Confirmed orders                                                |
+| Pipeline             | `opportunity`    | Uses built-in `salesstage` + `WinOpportunity` / `LoseOpportunity` |
+| Order                | `salesorder`     | Optional link back to originating opportunity                   |
+| Order line item      | `salesorderdetail` | Product + quantity + price under an order                     |
 
-Only `account` is wired up in this first slice — rest are scaffolded iteratively.
+All five entities are wired. Endpoints are under `/api/{accounts,contacts,products,opportunities,salesorders}`.
 
 ## Getting a Microsoft Dynamics 365 environment
 
@@ -102,11 +106,26 @@ uvicorn app.main:app --reload
 
 Then open http://127.0.0.1:8000/docs for the interactive Swagger UI.
 
+## Seeding demo data
+
+```bash
+cd backend
+python -m scripts.seed --reset    # wipes HeCRM-tagged data then seeds 3 distributors,
+                                  # 6 retail accounts, 9 contacts, 6 SKUs,
+                                  # 4 opportunities, 1 won → sales order with 3 lines.
+```
+
+Tagging convention (so `--reset` can find what's ours):
+
+- accounts use `accountnumber` starting with `HECRM-`
+- products use `productnumber` starting with `HCR-`
+
 ## Roadmap
 
 - [x] Repo scaffold, backend skeleton
-- [x] `Account` CRUD against Dataverse Web API
-- [ ] `Contact`, `Product`, `Opportunity`, `SalesOrder` endpoints
+- [x] `Account` / `Contact` / `Product` / `Opportunity` / `SalesOrder` endpoints
+- [x] Opportunity Win/Lose actions (wrap Dataverse bound actions)
+- [x] Seed script for realistic demo graph
 - [ ] React + TypeScript frontend
 - [ ] Playwright API tests (backend)
 - [ ] Playwright UI tests (frontend)
