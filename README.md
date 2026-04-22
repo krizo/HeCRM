@@ -120,14 +120,29 @@ Tagging convention (so `--reset` can find what's ours):
 - accounts use `accountnumber` starting with `HECRM-`
 - products use `productnumber` starting with `HCR-`
 
+## Testing
+
+Playwright-based API + UI suite lives in [`tests/`](tests/README.md). Built
+around the **journey pattern**: fixtures supply a typed `testConfig`, an
+`HeCrmApi` client aggregator, a scoped logger, and a `DataCollector` that
+auto-deletes every resource a test created. Specs only compose steps — all
+assertions live in journey functions. A custom `JourneyReporter` groups
+results by business area and writes `test-results/summary.md`.
+
+```bash
+cd tests
+npm install && cp .env.example .env
+npm run test:api
+```
+
 ## Roadmap
 
 - [x] Repo scaffold, backend skeleton
 - [x] `Account` / `Contact` / `Product` / `Opportunity` / `SalesOrder` endpoints
 - [x] Opportunity Win/Lose actions (wrap Dataverse bound actions)
 - [x] Seed script for realistic demo graph
-- [ ] React + TypeScript frontend
-- [ ] Playwright API tests (backend)
+- [x] React + TypeScript frontend
+- [x] Playwright API tests (backend) — journey pattern + custom reporter
 - [ ] Playwright UI tests (frontend)
 - [ ] CI with seed / teardown data hooks
 
