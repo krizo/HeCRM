@@ -85,11 +85,22 @@ export default class JourneyReporter implements Reporter {
     }
   }
 
+  // Worker stdout/stderr handling.
+  //
+  // Under a TTY (direct CLI invocation, IDE run-test-at-line), Playwright's
+  // internal runner already writes the worker's stdout to the terminal, so
+  // forwarding the same chunk again here would double every logger line.
+  //
+  // Under piped stdio (`npm run test:api`, CI), Playwright does NOT echo
+  // worker output on its own — without this forwarder, logger output would
+  // vanish. So we forward exactly when stdio is piped.
   onStdOut(chunk: Buffer | string): void {
+    if (process.stdout.isTTY) return
     process.stdout.write(typeof chunk === 'string' ? chunk : chunk.toString('utf-8'))
   }
 
   onStdErr(chunk: Buffer | string): void {
+    if (process.stderr.isTTY) return
     process.stderr.write(typeof chunk === 'string' ? chunk : chunk.toString('utf-8'))
   }
 
