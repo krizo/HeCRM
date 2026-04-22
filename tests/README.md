@@ -86,6 +86,31 @@ auto-fixture that publishes Playwright's `page` into the ambient context,
 so UI journey steps reach the browser via `getPage()` — same
 plumbing-free signature shape as the API steps.
 
+### The five layers of a UI test
+
+A single UI test flows through these layers (top → bottom = highest →
+lowest abstraction):
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. Spec file                                                    │   ui/opportunities.ui.spec.ts
+│    — names the business scenario; no plumbing, no asserts       │
+├─────────────────────────────────────────────────────────────────┤
+│ 2. Journey steps (atomic)                                       │   src/journeys/*UiSteps.ts
+│    — one test.step() + one focused expect()                     │
+├─────────────────────────────────────────────────────────────────┤
+│ 3. Page Objects                                                 │   src/pages/*.ts
+│    — locator factories over stable data-testid attributes       │
+├─────────────────────────────────────────────────────────────────┤
+│ 4. Playwright Page (DOM)                                        │   getPage() from context
+│    — clicks, fills, waits                                       │
+├─────────────────────────────────────────────────────────────────┤
+│ 5. The running app: Vite → React → FastAPI → Dataverse          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Page Objects
+
 Page Objects live in [`src/pages/`](src/pages/). They are exported as
 module-level objects (not classes), because a PO holds no per-test state
 — it's just a namespace of locator factories keyed off stable
@@ -104,8 +129,39 @@ export const opportunitiesPage = {
 }
 ```
 
-UI spec files **seed data via API** (faster, deterministic) and then
-exercise the browser with atomic UI steps:
+Why data-testid over text/role/CSS:
+
+- **Resilient** — copy edits don't break tests.
+- **Explicit contract** — the frontend deliberately puts them where
+  they're needed (`opp-card-${id}`, `kanban-col-${stage}`, etc.). If a
+  testid goes missing, grep catches it.
+- **Cheap** — no visual matching, no XPath gymnastics.
+
+### UI journey steps
+
+One HTTP **or** DOM interaction per step, wrapped in `test.step()`,
+business params in, assertion inside:
+
+```ts
+export async function clickWinOnCard(opportunity: Opportunity): Promise<void> {
+  return test.step(`click Win on opportunity card "${opportunity.name}"`, async () => {
+    await opportunitiesPage.winButton(opportunity.id).click()
+  })
+}
+
+export async function verifyOpportunityInWonPanel(opportunity: Opportunity): Promise<void> {
+  return test.step(`opportunity "${opportunity.name}" appears in the Won panel`, async () => {
+    await expect(opportunitiesPage.panelItem('won', opportunity.id)).toBeVisible()
+  })
+}
+```
+
+### API seed + UI exercise
+
+Spec files **seed data via API** (faster and deterministic — HeCRM
+doesn't currently expose create-forms in the UI, so creating via UI
+wouldn't be possible) and then exercise the browser with atomic UI
+steps:
 
 ```ts
 test('clicking Win moves the card to the Won panel', async () => {
@@ -120,8 +176,43 @@ test('clicking Win moves the card to the Won panel', async () => {
 })
 ```
 
-The `data` fixture's cleanup still runs — whether a test created data via
-API or UI, the `DataCollector` deletes it the same way on teardown.
+Reader sees exactly: seed (distributor, opportunity@proposing) → open UI →
+click Win → verify in Won panel → verify out of proposing column. Six
+steps, no plumbing, no ambiguity.
+
+### What happens at runtime
+
+Walking through the test above from `test(...)` to cleanup:
+
+1. **Fixture graph resolves** (Playwright runs the dependency DAG):
+   `testConfig` → `logger` → `request` (built-in) → `api` → `data` →
+   `browser` → `context` → `page` (built-ins) → `_ambientContext`
+   (auto, publishes `api`/`data`/`logger`/`testConfig` into `context.ts`)
+   → `_uiPageContext` (auto, publishes `page`).
+2. **Test body runs.** `createDistributor(...)` calls `getApi()` under the
+   hood → HTTP POST `/api/accounts` → Playwright's `APIRequestContext`
+   sends the request → FastAPI serves it → Dataverse Web API creates the
+   row → response bubbles back. Logger prints an HTTP line. Account id
+   goes to `DataCollector`.
+3. **UI navigation.** `openOpportunitiesPage()` calls `getPage().goto()`
+   → Chromium loads the Vite dev server → React app renders → card for
+   our opportunity appears because it was seeded via API.
+4. **UI interaction.** `clickWinOnCard(opportunity)` fetches the
+   `getByTestId('opp-win-{id}')` locator → Playwright clicks → React
+   mutation runs → TanStack Query invalidates the query → UI re-renders
+   → card moves.
+5. **UI verification.** `verifyOpportunityInWonPanel(opportunity)` awaits
+   a `toBeVisible()` assertion on the Won-panel item — Playwright's
+   [auto-waiting](https://playwright.dev/docs/actionability) means it
+   retries until the element shows up or times out.
+6. **Teardown** (reverse order): the auto-fixtures clear the ambient
+   context; `data`'s cleanup deletes the opportunity and the
+   distributor via API in dependency order; the browser context and
+   page close; the HTTP client closes; `JourneyReporter.onTestEnd` fires
+   and writes the step tree to the terminal.
+
+No leaked DB rows, no stray browser tabs, no "fixture not closed"
+warnings — end-to-end in ~3 seconds per test.
 
 ## Step granularity — atomic only
 

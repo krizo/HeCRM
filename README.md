@@ -12,8 +12,16 @@ The domain models a drinks company that serves two customer groups:
 Data lives in Dynamics 365 — HeCRM is a thin, testable surface over the
 Dataverse Web API, designed from day one to be automated against.
 
-> **Full business narrative:** [docs/SALES_PROCESS.md](docs/SALES_PROCESS.md) —
-> every entity, stage, and endpoint derives from this document.
+> **Deep-dives:**
+> - [docs/SALES_PROCESS.md](docs/SALES_PROCESS.md) — the business
+>   narrative every entity, stage, and endpoint derives from.
+> - [docs/DYNAMICS_INTEGRATION.md](docs/DYNAMICS_INTEGRATION.md) — how
+>   the FastAPI backend authenticates to and speaks the Dataverse Web
+>   API (OAuth2, OData, `@odata.bind`, bound vs unbound actions, Pydantic
+>   ↔ Dataverse mapping, gotchas).
+> - [tests/README.md](tests/README.md) — test-suite doctrine: journey
+>   pattern, ambient context, Page Objects, reporter output, and an
+>   end-to-end walkthrough of a single UI test.
 
 ## Repository layout
 
