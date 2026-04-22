@@ -10,6 +10,14 @@ dotenv.config({ path: path.resolve(__dirname, '.env') })
 const apiBaseUrl = process.env.HECRM_API_BASE_URL ?? 'http://127.0.0.1:8000/api'
 const uiBaseUrl = process.env.HECRM_UI_BASE_URL ?? 'http://127.0.0.1:5173'
 
+// Headless is the default (fast, CI-friendly). Set HECRM_HEADLESS=false to
+// watch the browser drive the app — useful for debugging a flaky UI step.
+const headless = process.env.HECRM_HEADLESS !== 'false'
+
+// Optional slow-motion for debugging: HECRM_SLOWMO_MS=500 inserts a 500ms
+// delay between every UI action so you can follow along.
+const slowMo = Number(process.env.HECRM_SLOWMO_MS ?? 0)
+
 export default defineConfig({
   testDir: path.resolve(__dirname),
   fullyParallel: false,                // journeys mutate shared Dataverse data
@@ -29,6 +37,8 @@ export default defineConfig({
     actionTimeout: 10_000,
     ignoreHTTPSErrors: true,
     trace: 'retain-on-failure',
+    headless,
+    launchOptions: { slowMo },
   },
   projects: [
     {

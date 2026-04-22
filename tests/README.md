@@ -61,6 +61,10 @@ npm run test:api:verbose        # api project with per-request HTTP log lines (`
 npm run test:ui                 # ui project only — drives Chromium through the app
 npm run test:ui:verbose         # ui project with full log forwarding
 npm test                        # api + ui in one go
+
+# Debug UI tests by watching the browser:
+HECRM_HEADLESS=false npm run test:ui
+HECRM_HEADLESS=false HECRM_SLOWMO_MS=300 npm run test:ui -- --grep "Win"
 npm run report                  # open the HTML report
 npm run typecheck               # TypeScript strict, no emit
 npm run lint                    # ESLint flat config, --max-warnings=0
