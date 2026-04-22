@@ -196,7 +196,9 @@ export default class JourneyReporter implements Reporter {
     fs.mkdirSync(outDir, { recursive: true })
     const file = path.join(outDir, 'summary.md')
 
-    const rows = [...groupBy(this.records, (r) => r.journey).entries()]
+    const grouped = [...groupBy(this.records, (r) => r.journey).entries()]
+
+    const overviewRows = grouped
       .map(([journey, tests]) => {
         const pass = tests.filter((t) => t.status === 'passed').length
         const fail = tests.filter((t) => t.status === 'failed' || t.status === 'timedOut').length
@@ -206,25 +208,77 @@ export default class JourneyReporter implements Reporter {
       })
       .join('\n')
 
+    const moduleSections = grouped
+      .map(([journey, tests]) => {
+        const pass = tests.filter((t) => t.status === 'passed').length
+        const fail = tests.filter((t) => t.status === 'failed' || t.status === 'timedOut').length
+        const dur = tests.reduce((s, t) => s + t.duration, 0)
+        const icon = fail === 0 ? '✅' : '❌'
+        const testRows = tests
+          .map((t, i) => {
+            const escapedTitle = t.title.replace(/\|/g, '\\|')
+            return `| ${i + 1} | ${escapedTitle} | ${statusBadge(t.status)} | ${t.duration}ms |`
+          })
+          .join('\n')
+        return `### ${icon} ${journey} (${pass}/${tests.length} passed · ${dur}ms)
+
+| # | Test | Status | Duration |
+|---|------|--------|----------|
+${testRows}`
+      })
+      .join('\n\n')
+
     const failedDetails = this.records
       .filter((r) => r.status === 'failed' || r.status === 'timedOut')
-      .map((r) => `- **${r.title}** (${r.journey})\n  \`\`\`\n  ${r.error ?? 'no error message captured'}\n  \`\`\``)
-      .join('\n')
+      .map((r) => {
+        const cleaned = stripAnsi(r.error ?? 'no error message captured')
+        return `- **${r.title}** (${r.journey})\n\n  \`\`\`\n  ${cleaned.split('\n').join('\n  ')}\n  \`\`\``
+      })
+      .join('\n\n')
 
     const body = `# HeCRM test run — ${result.status}
 
 Total duration: **${result.duration}ms**
 
+## Overview
+
 | Journey | Total | Passed | Failed | Duration |
 |---------|-------|--------|--------|----------|
-${rows}
+${overviewRows}
 
-${failedDetails ? `## Failures\n\n${failedDetails}\n` : '✅ All tests passed.\n'}
-`
+## Tests by module
+
+${moduleSections}
+
+${failedDetails ? `## Failures\n\n${failedDetails}\n` : ''}`
 
     fs.writeFileSync(file, body, 'utf-8')
     line('')
     line(`${C.dim}Markdown summary written to ${path.relative(process.cwd(), file)}${C.reset}`)
+  }
+}
+
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPE = /\x1b\[[0-9;]*[A-Za-z]/g
+
+function stripAnsi(input: string): string {
+  return input.replace(ANSI_ESCAPE, '')
+}
+
+function statusBadge(status: TestResult['status']): string {
+  switch (status) {
+    case 'passed':
+      return '✅ passed'
+    case 'failed':
+      return '❌ failed'
+    case 'timedOut':
+      return '⏱️ timedOut'
+    case 'skipped':
+      return '⏭️ skipped'
+    case 'interrupted':
+      return '⏸️ interrupted'
+    default:
+      return status
   }
 }
 
