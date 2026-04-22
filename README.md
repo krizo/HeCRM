@@ -173,7 +173,7 @@ to fail on any warning.
 - [x] Seed script for realistic demo graph
 - [x] React + TypeScript frontend
 - [x] Playwright API tests (backend) — journey pattern + custom reporter
-- [ ] Playwright UI tests (frontend)
+- [x] Playwright UI tests (frontend) — same doctrine, Page Objects, `getPage()` ambient
 - [ ] CI with seed / teardown data hooks
 
 ## License

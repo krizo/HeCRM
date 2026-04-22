@@ -38,7 +38,7 @@ export function OpportunitiesPage() {
           const items = byStage.get(stage) ?? []
           const totalValue = items.reduce((sum, o) => sum + (o.estimated_value ?? 0), 0)
           return (
-            <Card key={stage} className="flex flex-col">
+            <Card key={stage} className="flex flex-col" data-testid={`kanban-col-${stage}`}>
               <CardHeader
                 title={
                   <span className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export function OpportunitiesPage() {
         {(['won', 'lost'] as OpportunityStage[]).map((stage) => {
           const items = byStage.get(stage) ?? []
           return (
-            <Card key={stage}>
+            <Card key={stage} data-testid={`kanban-panel-${stage}`}>
               <CardHeader
                 title={
                   <span className="flex items-center gap-2">
@@ -117,7 +117,7 @@ export function OpportunitiesPage() {
               ) : (
                 <ul className="divide-y divide-slate-200">
                   {items.slice(0, 10).map((o) => (
-                    <li key={o.id} className="px-5 py-3 flex items-center justify-between">
+                    <li key={o.id} data-testid={`kanban-panel-${stage}-item-${o.id}`} className="px-5 py-3 flex items-center justify-between">
                       <div className="min-w-0">
                         <Link
                           to={o.customer_id ? `/accounts/${o.customer_id}` : '#'}

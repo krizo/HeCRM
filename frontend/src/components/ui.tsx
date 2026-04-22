@@ -1,10 +1,18 @@
 import type { ReactNode } from 'react'
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = '',
+  'data-testid': testId = 'card',
+}: {
+  children: ReactNode
+  className?: string
+  'data-testid'?: string
+}) {
   return (
     <div
       className={`bg-white rounded-lg border border-slate-200 shadow-sm ${className}`}
-      data-testid="card"
+      data-testid={testId}
     >
       {children}
     </div>

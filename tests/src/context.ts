@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import type { HeCrmApi } from './clients/HeCrmApi.js'
 import type { TestConfig } from './config/types.js'
 import type { DataCollector } from './fixtures/DataCollector.js'
@@ -16,9 +17,14 @@ interface StepContext {
 // `fullyParallel: false`, so at most one test is active at any time.
 // If we ever enable parallelism, swap this for AsyncLocalStorage.
 let _active: StepContext | undefined
+let _activePage: Page | undefined
 
 export function setContext(ctx: StepContext | undefined): void {
   _active = ctx
+}
+
+export function setPage(page: Page | undefined): void {
+  _activePage = page
 }
 
 function current(): StepContext {
@@ -37,3 +43,13 @@ export const getApi = (): HeCrmApi => current().api
 export const getData = (): DataCollector => current().data
 export const getLogger = (): Logger => current().logger
 export const getTestConfig = (): TestConfig => current().testConfig
+
+export function getPage(): Page {
+  if (!_activePage) {
+    throw new Error(
+      'UI page context is not active — use `test` from `uiFixture.ts` (not `baseFixture.ts`) ' +
+        'for UI specs.',
+    )
+  }
+  return _activePage
+}

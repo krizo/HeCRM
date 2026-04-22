@@ -33,30 +33,34 @@ tests/
 ├── .env.example                # all HECRM_* env vars (see below)
 ├── src/
 │   ├── config/                 # TestConfig type + loader from process.env
-│   ├── context.ts              # AsyncLocalStorage-like ambient bag (getApi / getData / …)
+│   ├── context.ts              # ambient bag — getApi / getData / getLogger / getPage …
 │   ├── clients/                # ApiClient base + 5 sub-clients + HeCrmApi aggregator
-│   ├── fixtures/               # test.extend: testConfig, api, logger, data (+ auto-fixture)
-│   ├── journeys/               # atomic business-process steps (one call + one assert each)
+│   ├── pages/                  # Page Objects for each UI view (AccountsPage, …)
+│   ├── fixtures/               # baseFixture (api/data/logger) + uiFixture (adds page)
+│   ├── journeys/               # atomic steps — *Steps.ts for API, *UiSteps.ts for UI
 │   ├── logger/                 # colored, scoped, timing-aware console logger
 │   └── reporters/              # JourneyReporter — console tree + markdown summary
-├── api/                        # *.api.spec.ts — backend tests
-└── ui/                         # *.ui.spec.ts — frontend tests (wired up next)
+├── api/                        # *.api.spec.ts — imports test from baseFixture
+└── ui/                         # *.ui.spec.ts — imports test from uiFixture
 ```
 
 ## Running
 
 ```bash
 cd tests
-cp .env.example .env            # adjust if backend runs elsewhere
+cp .env.example .env            # adjust if backend / frontend run elsewhere
 npm install
+npx playwright install chromium # one-time browser download for UI tests
 
-# make sure the backend is up on http://127.0.0.1:8000
-(cd ../backend && source .venv/bin/activate && make dev) &
+# services needed:
+(cd ../backend  && source .venv/bin/activate && make dev) &    # always
+(cd ../frontend && npm run dev) &                              # UI tests only
 
 npm run test:api                # api project only (quiet — step tree + summary only)
-npm run test:api:verbose        # api project with per-request HTTP log lines (`list` reporter added)
-npm run test:ui                 # ui project only (once written)
-npm test                        # both
+npm run test:api:verbose        # api project with per-request HTTP log lines (`list` added)
+npm run test:ui                 # ui project only — drives Chromium through the app
+npm run test:ui:verbose         # ui project with full log forwarding
+npm test                        # api + ui in one go
 npm run report                  # open the HTML report
 npm run typecheck               # TypeScript strict, no emit
 npm run lint                    # ESLint flat config, --max-warnings=0
@@ -69,6 +73,51 @@ ESLint flat config ([`eslint.config.js`](eslint.config.js)) extends
 inline `expect()` calls — `playwright/expect-expect` is disabled with a
 comment explaining why (assertions live in journey steps). Unused
 fixture parameters use `_` to satisfy `no-empty-pattern`.
+
+## UI tests — the same doctrine, one extra layer
+
+UI specs import `test` from [`src/fixtures/uiFixture.ts`](src/fixtures/uiFixture.ts)
+instead of `baseFixture.ts`. The UI fixture extends the base with an
+auto-fixture that publishes Playwright's `page` into the ambient context,
+so UI journey steps reach the browser via `getPage()` — same
+plumbing-free signature shape as the API steps.
+
+Page Objects live in [`src/pages/`](src/pages/). They are exported as
+module-level objects (not classes), because a PO holds no per-test state
+— it's just a namespace of locator factories keyed off stable
+`data-testid` attributes that the frontend deliberately exposes:
+
+```ts
+export const opportunitiesPage = {
+  path: '/opportunities',
+  testId: 'opportunities-page',
+
+  async goto() { /* ... uses getPage() ... */ },
+  card: (id: string) => getPage().getByTestId(`opp-card-${id}`),
+  winButton: (id: string) => getPage().getByTestId(`opp-win-${id}`),
+  column: (stage) => getPage().getByTestId(`kanban-col-${stage}`),
+  // ...
+}
+```
+
+UI spec files **seed data via API** (faster, deterministic) and then
+exercise the browser with atomic UI steps:
+
+```ts
+test('clicking Win moves the card to the Won panel', async () => {
+  const distributor = await createDistributor({ name: `UI Opp Win ${Date.now()}` })
+  const opportunity = await createOpportunity({ customer: distributor, stage: 'proposing' })
+
+  await openOpportunitiesPage()
+  await clickWinOnCard(opportunity)
+
+  await verifyOpportunityInWonPanel(opportunity)
+  await verifyCardRemovedFromColumn(opportunity, 'proposing')
+})
+```
+
+The `data` fixture's cleanup still runs — whether a test created data via
+API or UI, the `DataCollector` deletes it the same way on teardown.
 
 ## Step granularity — atomic only
 
