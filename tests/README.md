@@ -28,20 +28,21 @@ Playwright-based API and UI test suite for HeCRM, built on a strict
 
 ```
 tests/
-├── playwright.config.ts        # projects: api / ui; reporters: JourneyReporter + html
+├── playwright.config.ts        # projects: api / ui / dataverse; reporters: JourneyReporter + html
 ├── eslint.config.js            # flat config: @eslint/js + typescript-eslint + playwright
 ├── .env.example                # all HECRM_* env vars (see below)
 ├── src/
 │   ├── config/                 # TestConfig type + loader from process.env
-│   ├── context.ts              # ambient bag — getApi / getData / getLogger / getPage …
-│   ├── clients/                # ApiClient base + 5 sub-clients + HeCrmApi aggregator
+│   ├── context.ts              # ambient bag — getApi / getData / getLogger / getPage / getDv …
+│   ├── clients/                # HeCrmApi + 5 sub-clients, DataverseRawClient (direct OData)
 │   ├── pages/                  # Page Objects for each UI view (AccountsPage, …)
-│   ├── fixtures/               # baseFixture (api/data/logger) + uiFixture (adds page)
-│   ├── journeys/               # atomic steps — *Steps.ts for API, *UiSteps.ts for UI
+│   ├── fixtures/               # base (api/data/logger) + ui (adds page) + dataverse (adds dv)
+│   ├── journeys/               # atomic steps — *Steps.ts / *UiSteps.ts / dataverseSteps.ts
 │   ├── logger/                 # colored, scoped, timing-aware console logger
 │   └── reporters/              # JourneyReporter — console tree + markdown summary
 ├── api/                        # *.api.spec.ts — imports test from baseFixture
-└── ui/                         # *.ui.spec.ts — imports test from uiFixture
+├── ui/                         # *.ui.spec.ts — imports test from uiFixture
+└── dataverse/                  # *.dv.spec.ts — imports test from dataverseFixture
 ```
 
 ## Running
@@ -60,7 +61,9 @@ npm run test:api                # api project only (quiet — step tree + summar
 npm run test:api:verbose        # api project with per-request HTTP log lines (`list` added)
 npm run test:ui                 # ui project only — drives Chromium through the app
 npm run test:ui:verbose         # ui project with full log forwarding
-npm test                        # api + ui in one go
+npm run test:dataverse          # dataverse contract tests — raw OData, no FastAPI in the loop
+npm run test:dataverse:verbose  # same with per-request HTTP log lines
+npm test                        # api + ui + dataverse in one go
 
 # Debug UI tests by watching the browser:
 HECRM_HEADLESS=false npm run test:ui
@@ -77,6 +80,55 @@ ESLint flat config ([`eslint.config.js`](eslint.config.js)) extends
 inline `expect()` calls — `playwright/expect-expect` is disabled with a
 comment explaining why (assertions live in journey steps). Unused
 fixture parameters use `_` to satisfy `no-empty-pattern`.
+
+## Three projects, three contracts
+
+| Project     | Imports `test` from            | What it proves                                                            | Auto-skips if                             |
+|-------------|--------------------------------|---------------------------------------------------------------------------|-------------------------------------------|
+| `api`       | `fixtures/baseFixture.ts`      | Our FastAPI layer behaves as designed — mappers, validation, routing      | Backend down                              |
+| `ui`        | `fixtures/uiFixture.ts`        | The React app surfaces data and mutations correctly in the browser        | Frontend dev server down                  |
+| `dataverse` | `fixtures/dataverseFixture.ts` | Microsoft Dataverse's OData contract still matches what we code against   | `HECRM_DATAVERSE_*` / `HECRM_AZURE_*` env vars missing |
+
+All three share `testConfig`, `logger`, `JourneyReporter`, and the
+step-granularity + no-plumbing-in-signatures doctrine. They only diverge
+in what the fixture stack adds on top and what layer the steps poke.
+
+## Dataverse contract tests — raw OData, no FastAPI
+
+Dataverse specs (`tests/dataverse/*.dv.spec.ts`) talk directly to the
+Microsoft Dataverse Web API, bypassing our backend entirely. They exist
+to **pin the third-party contract** our whole stack assumes: OAuth2
+scope, OData envelope shape, `@odata.bind` semantics, unbound-action
+bodies, error codes. If Microsoft changes any of this (very rare) or
+the tenant is misconfigured (not rare at all), these tests fail loudly
+with a clear pointer at which assumption broke.
+
+The client ([`src/clients/DataverseRawClient.ts`](src/clients/DataverseRawClient.ts))
+uses `@azure/msal-node` for the client-credentials flow — same flow the
+Python backend uses via Microsoft's Python MSAL. Tokens are cached with
+the same 60-second pre-expiry leeway.
+
+Nine contract tests (~23 s, two minutes of Dataverse actually doing
+work) split across five files:
+
+| File                | What it pins                                                              |
+|---------------------|---------------------------------------------------------------------------|
+| `auth.dv.spec.ts`   | MSAL token returns a valid bearer with a future expiry                    |
+| `schema.dv.spec.ts` | `EntityDefinitions` exposes the attributes HeCRM reads; `$select`+`$top` returns the canonical `@odata.context` + `value[]` envelope |
+| `bindings.dv.spec.ts` | `parentaccountid@odata.bind` works round-trip; polymorphic customer fields need the `_account` suffix (and reject without it) |
+| `actions.dv.spec.ts` | `POST /WinOpportunity` with `OpportunityClose` flips statecode 0 → 1      |
+| `errors.dv.spec.ts` | `GET` on a non-existent GUID returns `404` with `error.code` matching `/^0x[0-9a-f]+$/` |
+
+Cleanup uses [`DataverseCollector`](src/fixtures/DataverseCollector.ts)
+— same "track-on-create, delete-in-reverse-on-teardown" pattern as the
+API suite's `DataCollector`, but talking directly to the OData API.
+
+Why useful in a portfolio: shows the candidate separates concerns at
+the right boundary — not every test has to go through the app's own
+code, some tests should pin the *foundations* you rest on. Catches
+tenant licence changes, security-role regressions, schema drift in
+Dynamics before they surface as red API tests with a confusing stack
+trace.
 
 ## UI tests — the same doctrine, one extra layer
 

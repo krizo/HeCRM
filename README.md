@@ -182,6 +182,7 @@ to fail on any warning.
 - [x] React + TypeScript frontend
 - [x] Playwright API tests (backend) — journey pattern + custom reporter
 - [x] Playwright UI tests (frontend) — same doctrine, Page Objects, `getPage()` ambient
+- [x] Playwright Dataverse contract tests — raw OData, MSAL-node, pins the Microsoft boundary
 - [ ] CI with seed / teardown data hooks
 
 ## License

@@ -1,7 +1,9 @@
 import type { Page } from '@playwright/test'
+import type { DataverseRawClient } from './clients/DataverseRawClient.js'
 import type { HeCrmApi } from './clients/HeCrmApi.js'
 import type { TestConfig } from './config/types.js'
 import type { DataCollector } from './fixtures/DataCollector.js'
+import type { DataverseCollector } from './fixtures/DataverseCollector.js'
 import type { Logger } from './logger/Logger.js'
 
 interface StepContext {
@@ -11,6 +13,11 @@ interface StepContext {
   readonly testConfig: TestConfig
 }
 
+interface DataverseContext {
+  readonly dv: DataverseRawClient
+  readonly dvData: DataverseCollector
+}
+
 // Module-level active context, set by the auto-fixture in baseFixture.ts
 // before the test body runs and cleared in teardown.
 // Safe because playwright.config.ts pins `workers: 1` and
@@ -18,6 +25,7 @@ interface StepContext {
 // If we ever enable parallelism, swap this for AsyncLocalStorage.
 let _active: StepContext | undefined
 let _activePage: Page | undefined
+let _activeDataverse: DataverseContext | undefined
 
 export function setContext(ctx: StepContext | undefined): void {
   _active = ctx
@@ -25,6 +33,10 @@ export function setContext(ctx: StepContext | undefined): void {
 
 export function setPage(page: Page | undefined): void {
   _activePage = page
+}
+
+export function setDataverse(ctx: DataverseContext | undefined): void {
+  _activeDataverse = ctx
 }
 
 function current(): StepContext {
@@ -35,6 +47,15 @@ function current(): StepContext {
     )
   }
   return _active
+}
+
+function currentDataverse(): DataverseContext {
+  if (!_activeDataverse) {
+    throw new Error(
+      'Dataverse context is not active — use `test` from `dataverseFixture.ts` for dataverse specs.',
+    )
+  }
+  return _activeDataverse
 }
 
 // Ambient accessors available inside any step / helper running within a test.
@@ -53,3 +74,6 @@ export function getPage(): Page {
   }
   return _activePage
 }
+
+export const getDv = (): DataverseRawClient => currentDataverse().dv
+export const getDvData = (): DataverseCollector => currentDataverse().dvData

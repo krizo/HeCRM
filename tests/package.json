@@ -8,6 +8,8 @@
     "test:api:verbose": "playwright test --project=api --reporter=./src/reporters/JourneyReporter.ts,list",
     "test:ui": "playwright test --project=ui",
     "test:ui:verbose": "playwright test --project=ui --reporter=./src/reporters/JourneyReporter.ts,list",
+    "test:dataverse": "playwright test --project=dataverse",
+    "test:dataverse:verbose": "playwright test --project=dataverse --reporter=./src/reporters/JourneyReporter.ts,list",
     "test": "playwright test",
     "report": "playwright show-report",
     "typecheck": "tsc --noEmit",
@@ -15,6 +17,7 @@
     "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
+    "@azure/msal-node": "^5.1.4",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.48.0",
     "@types/node": "^22.0.0",

@@ -53,5 +53,12 @@ export default defineConfig({
       testMatch: /.*\.ui\.spec\.ts/,
       use: { baseURL: uiBaseUrl },
     },
+    {
+      // Contract tests against the raw Dataverse Web API. Auto-skip
+      // when HECRM_DATAVERSE_* / HECRM_AZURE_* credentials are missing.
+      name: 'dataverse',
+      testDir: path.resolve(__dirname, 'dataverse'),
+      testMatch: /.*\.dv\.spec\.ts/,
+    },
   ],
 })

@@ -22,6 +22,12 @@ export function loadConfig(): TestConfig {
       password: env('HECRM_AUTH_PASSWORD', ''),
       tenantId: env('HECRM_AUTH_TENANT_ID', ''),
     },
+    dataverse: {
+      url: env('HECRM_DATAVERSE_URL', ''),
+      tenantId: env('HECRM_AZURE_TENANT_ID', ''),
+      clientId: env('HECRM_AZURE_CLIENT_ID', ''),
+      clientSecret: env('HECRM_AZURE_CLIENT_SECRET', ''),
+    },
     seed: {
       accountPrefix: env('HECRM_ACCOUNT_PREFIX', 'HECRM-'),
       productPrefix: env('HECRM_PRODUCT_PREFIX', 'HCR-'),
